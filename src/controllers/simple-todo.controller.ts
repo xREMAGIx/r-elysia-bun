@@ -12,7 +12,7 @@ simpleTodoRoutes.group(
   `/simple-todo`,
   {
     detail: {
-      tags: ["simple_todo"],
+      tags: ["Simple Todo"],
     },
   },
   (app) =>
@@ -100,20 +100,23 @@ simpleTodoRoutes.group(
               }
             )
             //* Delete
-            .delete("/:id", ({ params }) => {
-              const { id } = params;
+            .delete(
+              "/:id",
+              ({ params }) => {
+                const { id } = params;
 
-              return SimpleTodoService.delete(id);
-            }, {
-              response: t.Object({
-                id: t.Number()
-              }),
-              detail: {
-                summary: "Delete Simple Todo",
+                return SimpleTodoService.delete(id);
               },
-            })
+              {
+                response: t.Object({
+                  id: t.Number(),
+                }),
+                detail: {
+                  summary: "Delete Simple Todo",
+                },
+              }
+            )
       )
-
 
       //* List
       .use(queryPaginationPlugin)
