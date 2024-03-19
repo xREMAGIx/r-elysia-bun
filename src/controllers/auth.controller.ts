@@ -96,7 +96,7 @@ authRoutes.group(
         "/profile",
         async ({ userId }) => {
           const result = await AuthService.getProfile({
-            userId: Number(userId),
+            userId: userId,
           });
 
           return {

@@ -24,16 +24,16 @@ export const tokenPlugin = new Elysia({ name: "token-plugin" })
 export const authenticatePlugin = new Elysia({ name: "authenticate-plugin" })
   .use(tokenPlugin)
   .use(bearer())
-  .onBeforeHandle({ as: "scoped" }, ({ bearer }) => {
+  .onBeforeHandle({ as: "global" }, ({ bearer }) => {
     if (!bearer) {
       throw new CustomError.UnauthorizedError("Unauthorized!");
     }
   })
-  .resolve({ as: "scoped" }, async ({ bearer, accessJwt }) => {
+  .resolve({ as: "global" }, async ({ bearer, accessJwt }) => {
     const data = await accessJwt.verify(bearer);
 
     if (!data) {
-      throw new CustomError.UnauthorizedError("Tokens have expired!");
+      throw new CustomError.UnauthorizedError("Invalid token!");
     }
 
     if (!data["sub"]) {
@@ -41,7 +41,7 @@ export const authenticatePlugin = new Elysia({ name: "authenticate-plugin" })
     }
 
     return {
-      userId: data["sub"],
+      userId: Number(data["sub"]),
     };
   });
 

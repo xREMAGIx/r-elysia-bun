@@ -1,46 +1,47 @@
 import { InvalidContentError } from "@/libs/error";
-import { queryPaginationPlugin } from "@/libs/plugins";
+import { authenticatePlugin, queryPaginationPlugin } from "@/libs/plugins";
 import {
-  detailSimpleTodoDataSchema,
-  insertSimpleTodoSchema,
-  listSimpleTodoDataSchema,
-  simpleTodoModel,
-} from "@/models/simple-todo.model";
-import SimpleTodoService from "@/services/simple-todo.service";
+  baseSelectTodoSchema,
+  createTodoParamSchema,
+  detailTodoDataSchema,
+  listTodoDataSchema,
+  todoModel,
+  updateTodoParamSchema,
+} from "@/models/todo.model";
+import TodoService from "@/services/todo.service";
 import { Elysia, t } from "elysia";
 
-export const simpleTodoRoutes = new Elysia({ prefix: "api/v1" });
+export const todoRoutes = new Elysia({ prefix: "api/v1" });
 
-simpleTodoRoutes.group(
-  `/simple-todo`,
+todoRoutes.group(
+  `/todo`,
   {
     detail: {
-      tags: ["Simple Todo"],
+      tags: ["Todo"],
+      security: [{ JwtAuth: [] }],
     },
   },
   (app) =>
     app
-      .use(simpleTodoModel)
-
+      .use(todoModel)
+      .use(authenticatePlugin)
       //* Create
       .post(
         "/",
-        async ({ body }) => {
-          const { name, isCompleted } = body;
-          const data = await SimpleTodoService.create({
-            name: name,
-            isCompleted: isCompleted ?? false,
-          });
+        async ({ body, userId }) => {
+          const data = await TodoService.create({ ...body, userId });
 
           return {
             data: data,
           };
         },
         {
-          body: insertSimpleTodoSchema,
-          response: detailSimpleTodoDataSchema,
+          body: createTodoParamSchema,
+          response: t.Object({
+            data: baseSelectTodoSchema,
+          }),
           detail: {
-            summary: "Create Simple Todo",
+            summary: "Create Todo",
           },
         }
       )
@@ -60,7 +61,7 @@ simpleTodoRoutes.group(
               "/:id",
               async ({ params, error }) => {
                 const { id } = params;
-                const data = await SimpleTodoService.getDetail({ id });
+                const data = await TodoService.getDetail({ id });
 
                 if (!data) {
                   throw error(404, "Not Found UwU");
@@ -71,9 +72,9 @@ simpleTodoRoutes.group(
                 };
               },
               {
-                response: detailSimpleTodoDataSchema,
+                response: detailTodoDataSchema,
                 detail: {
-                  summary: "Get Simple Todo Detail",
+                  summary: "Get Todo Detail",
                 },
               }
             )
@@ -82,12 +83,10 @@ simpleTodoRoutes.group(
               "/:id",
               async ({ params, body }) => {
                 const { id } = params;
-                const { name, isCompleted } = body;
 
-                const data = await SimpleTodoService.update({
+                const data = await TodoService.update({
                   id,
-                  name,
-                  isCompleted: isCompleted ?? false,
+                  ...body,
                 });
 
                 return {
@@ -95,10 +94,10 @@ simpleTodoRoutes.group(
                 };
               },
               {
-                body: insertSimpleTodoSchema,
-                response: detailSimpleTodoDataSchema,
+                body: updateTodoParamSchema,
+                response: detailTodoDataSchema,
                 detail: {
-                  summary: "Update Simple Todo",
+                  summary: "Update Todo",
                 },
               }
             )
@@ -108,14 +107,14 @@ simpleTodoRoutes.group(
               ({ params }) => {
                 const { id } = params;
 
-                return SimpleTodoService.delete(id);
+                return TodoService.delete(id);
               },
               {
                 response: t.Object({
                   id: t.Number(),
                 }),
                 detail: {
-                  summary: "Delete Simple Todo",
+                  summary: "Delete Todo",
                 },
               }
             )
@@ -125,21 +124,21 @@ simpleTodoRoutes.group(
       .use(queryPaginationPlugin)
       .get(
         "/",
-        async ({ query: { sortBy = "desc", limit, page } }) => {
+        async ({ query: { sortBy = "desc", limit = 10, page = 1 } }) => {
           if (sortBy !== "asc" && sortBy !== "desc") {
             throw new InvalidContentError("Sortby not valid!");
           }
 
-          return await SimpleTodoService.getList({
-            sortBy: sortBy ?? "asc",
+          return await TodoService.getList({
+            sortBy: sortBy,
             limit: Number(limit),
             page: Number(page),
           });
         },
         {
-          response: listSimpleTodoDataSchema,
+          response: listTodoDataSchema,
           detail: {
-            summary: "Get Simple Todo List",
+            summary: "Get Todo List",
           },
         }
       )

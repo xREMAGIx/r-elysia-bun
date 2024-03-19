@@ -1,8 +1,8 @@
-import { Elysia, t } from "elysia";
+import { Elysia, Static, t } from "elysia";
 
 export const queryPaginationSchema = t.Partial(
   t.Object({
-    sortBy: t.String(),
+    sortBy: t.Union([t.Literal("asc"), t.Literal("desc")]),
     limit: t.Numeric(),
     page: t.Numeric(),
   })
@@ -15,7 +15,10 @@ export const metaPaginationSchema = t.Object({
   totalPages: t.Number(),
 });
 
+export type QueryPaginationParams = Static<typeof queryPaginationSchema>;
+
+//* Model
 export const queryPaginationModel = new Elysia().model({
-  queryPagination: queryPaginationSchema,
-  metaPagination: metaPaginationSchema,
+  "pagination.query": queryPaginationSchema,
+  "pagination.meta": metaPaginationSchema,
 });
