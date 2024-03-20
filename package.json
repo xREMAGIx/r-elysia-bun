@@ -9,6 +9,7 @@
     "@elysiajs/bearer": "^1.0.2",
     "@elysiajs/cors": "^1.0.2",
     "@elysiajs/jwt": "^1.0.2",
+    "@elysiajs/static": "^1.0.2",
     "@elysiajs/swagger": "^1.0.0",
     "dayjs": "^1.11.10",
     "drizzle-orm": "^0.30.2",

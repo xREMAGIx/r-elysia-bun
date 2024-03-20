@@ -1,4 +1,4 @@
-import { db } from "@/config/database";
+import { DBType } from "@/config/database";
 import { userTable } from "@/db-schema";
 import { InvalidContentError } from "@/libs/error";
 import {
@@ -9,11 +9,17 @@ import {
 } from "@/models/auth.model";
 import { eq } from "drizzle-orm";
 
-export default abstract class AuthService {
-  static async login(params: LoginParams) {
+export default class AuthService {
+  private db;
+
+  constructor(db: DBType) {
+    this.db = db;
+  }
+
+  async login(params: LoginParams) {
     const { email, password } = params;
 
-    const result = await db.query.userTable.findFirst({
+    const result = await this.db.query.userTable.findFirst({
       where: eq(userTable.email, email),
     });
 
@@ -37,7 +43,7 @@ export default abstract class AuthService {
     return data;
   }
 
-  static async register(params: RegisterParams) {
+  async register(params: RegisterParams) {
     const { email, password, username } = params;
 
     const bcryptHash = await Bun.password.hash(password, {
@@ -45,7 +51,7 @@ export default abstract class AuthService {
       cost: Number(process.env.PASSWORD_HASH_CODE ?? 4),
     });
 
-    const results = await db
+    const results = await this.db
       .insert(userTable)
       .values({
         username: username,
@@ -61,10 +67,10 @@ export default abstract class AuthService {
     return data;
   }
 
-  static async getProfile(params: GetProfileParams) {
+  async getProfile(params: GetProfileParams) {
     const { userId } = params;
 
-    const result = await db.query.userTable.findFirst({
+    const result = await this.db.query.userTable.findFirst({
       where: eq(userTable.id, userId),
     });
 

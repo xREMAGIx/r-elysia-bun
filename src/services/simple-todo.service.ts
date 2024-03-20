@@ -1,4 +1,4 @@
-import { db } from "@/config/database";
+import { DBType } from "@/config/database";
 import { simpleTodoTable } from "@/db-schema";
 import { QueryPaginationParams } from "@/models/base";
 import {
@@ -8,11 +8,17 @@ import {
 } from "@/models/simple-todo.model";
 import { asc, desc, eq, sql } from "drizzle-orm";
 
-export default abstract class SimpleTodoService {
-  static async getList(params: QueryPaginationParams) {
+export default class SimpleTodoService {
+  private db;
+
+  constructor(db: DBType) {
+    this.db = db;
+  }
+
+  async getList(params: QueryPaginationParams) {
     const { sortBy, limit = 10, page = 1 } = params;
 
-    const simpleTodoList = await db.query.simpleTodoTable.findMany({
+    const simpleTodoList = await this.db.query.simpleTodoTable.findMany({
       limit: limit,
       offset: limit * (page - 1),
       orderBy:
@@ -21,7 +27,7 @@ export default abstract class SimpleTodoService {
           : [desc(simpleTodoTable.createdAt)],
     });
 
-    const totalQueryResult = await db.execute(sql<{ count: string }>`
+    const totalQueryResult = await this.db.execute(sql<{ count: string }>`
         SELECT count(*) FROM ${simpleTodoTable};
     `);
     const total = Number(totalQueryResult.rows[0].count);
@@ -38,24 +44,27 @@ export default abstract class SimpleTodoService {
     };
   }
 
-  static async getDetail(params: GetDetailSimpleTodoParams) {
+  async getDetail(params: GetDetailSimpleTodoParams) {
     const { id } = params;
 
-    return await db.query.simpleTodoTable.findFirst({
+    return await this.db.query.simpleTodoTable.findFirst({
       where: eq(simpleTodoTable.id, id),
     });
   }
 
-  static async create(params: CreateSimpleTodoParams) {
-    const results = await db.insert(simpleTodoTable).values(params).returning();
+  async create(params: CreateSimpleTodoParams) {
+    const results = await this.db
+      .insert(simpleTodoTable)
+      .values(params)
+      .returning();
 
     return results[0];
   }
 
-  static async update(params: UpdateSimpleTodoParams) {
+  async update(params: UpdateSimpleTodoParams) {
     const { id, ...rest } = params;
 
-    const results = await db
+    const results = await this.db
       .update(simpleTodoTable)
       .set({
         ...rest,
@@ -66,8 +75,8 @@ export default abstract class SimpleTodoService {
     return results[0];
   }
 
-  static async delete(id: number) {
-    const results = await db
+  async delete(id: number) {
+    const results = await this.db
       .delete(simpleTodoTable)
       .where(eq(simpleTodoTable.id, id))
       .returning({ id: simpleTodoTable.id });
