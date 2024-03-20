@@ -1,5 +1,9 @@
 import { InvalidContentError } from "@/libs/error";
-import { authenticatePlugin, queryPaginationPlugin } from "@/libs/plugins";
+import {
+  authenticatePlugin,
+  databasePlugin,
+  queryPaginationPlugin,
+} from "@/libs/plugins";
 import {
   baseSelectTodoSchema,
   createTodoParamSchema,
@@ -11,10 +15,10 @@ import {
 import TodoService from "@/services/todo.service";
 import { Elysia, t } from "elysia";
 
-export const todoRoutes = new Elysia({ prefix: "api/v1" });
-
-todoRoutes.group(
-  `/todo`,
+export const todoRoutes = new Elysia({
+  name: "todo",
+}).group(
+  `api/v1/todo`,
   {
     detail: {
       tags: ["Todo"],
@@ -23,13 +27,19 @@ todoRoutes.group(
   },
   (app) =>
     app
+      .use(databasePlugin)
+      .derive(({ db }) => {
+        return {
+          service: new TodoService(db),
+        };
+      })
       .use(todoModel)
       .use(authenticatePlugin)
       //* Create
       .post(
         "/",
-        async ({ body, userId }) => {
-          const data = await TodoService.create({ ...body, userId });
+        async ({ body, userId, service }) => {
+          const data = await service.create({ ...body, userId });
 
           return {
             data: data,
@@ -59,9 +69,9 @@ todoRoutes.group(
             //* Detail
             .get(
               "/:id",
-              async ({ params, error }) => {
+              async ({ params, error, service }) => {
                 const { id } = params;
-                const data = await TodoService.getDetail({ id });
+                const data = await service.getDetail({ id });
 
                 if (!data) {
                   throw error(404, "Not Found UwU");
@@ -81,10 +91,10 @@ todoRoutes.group(
             //* Update
             .put(
               "/:id",
-              async ({ params, body }) => {
+              async ({ params, body, service }) => {
                 const { id } = params;
 
-                const data = await TodoService.update({
+                const data = await service.update({
                   id,
                   ...body,
                 });
@@ -104,10 +114,10 @@ todoRoutes.group(
             //* Delete
             .delete(
               "/:id",
-              ({ params }) => {
+              ({ params, service }) => {
                 const { id } = params;
 
-                return TodoService.delete(id);
+                return service.delete(id);
               },
               {
                 response: t.Object({
@@ -124,12 +134,15 @@ todoRoutes.group(
       .use(queryPaginationPlugin)
       .get(
         "/",
-        async ({ query: { sortBy = "desc", limit = 10, page = 1 } }) => {
+        async ({
+          query: { sortBy = "desc", limit = 10, page = 1 },
+          service,
+        }) => {
           if (sortBy !== "asc" && sortBy !== "desc") {
             throw new InvalidContentError("Sortby not valid!");
           }
 
-          return await TodoService.getList({
+          return await service.getList({
             sortBy: sortBy,
             limit: Number(limit),
             page: Number(page),

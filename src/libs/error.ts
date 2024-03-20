@@ -1,18 +1,35 @@
-export class InvalidParamError extends Error {
+class BaseError extends Error {
+  statusCode: number;
+  isOperational: boolean;
+
   constructor(public message: string) {
     super(message);
+    this.statusCode = 500;
+    this.isOperational = true;
   }
 }
 
-export class InvalidContentError extends Error {
+export class InvalidParamError extends BaseError {
   constructor(public message: string) {
     super(message);
+    this.statusCode = 422;
+    this.isOperational = true;
   }
 }
 
-export class NotfoundDataError extends Error {
+export class InvalidContentError extends BaseError {
   constructor(public message: string) {
     super(message);
+    this.statusCode = 422;
+    this.isOperational = true;
+  }
+}
+
+export class NotfoundDataError extends BaseError {
+  constructor(public message: string) {
+    super(message);
+    this.statusCode = 404;
+    this.isOperational = true;
   }
 }
 

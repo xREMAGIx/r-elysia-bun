@@ -1,10 +1,10 @@
+import { db } from "@/config/database";
 import { queryPaginationModel } from "@/models/base";
 import bearer from "@elysiajs/bearer";
 import jwt from "@elysiajs/jwt";
-import { Elysia } from "elysia";
+import { Elysia, t } from "elysia";
 import * as CustomError from "./error";
 
-//* Plugins
 export const tokenPlugin = new Elysia({ name: "token-plugin" })
   .use(
     jwt({
@@ -52,25 +52,55 @@ export const errorPlugin = new Elysia({ name: "error-plugin" })
   .onError({ as: "scoped" }, ({ code, error, set }) => {
     switch (code) {
       case "InvalidContentError":
-        set.status = 422;
-
-        return {
-          code: 422,
-          error: error.message,
-        };
-
       case "UnauthorizedError":
+      case "InvalidParamError":
+      case "NotfoundDataError":
         set.status = error.statusCode;
 
         return {
           code: error.statusCode,
           error: error.message,
         };
+
+      case "INTERNAL_SERVER_ERROR":
+      default:
+        console.log(error.message);
+        set.status = 500;
+
+        return {
+          code: 500,
+          error: "Internal Server",
+        };
     }
   });
 
-export const queryPaginationPlugin = new Elysia()
+export const queryPaginationPlugin = new Elysia({ name: "query-pagination" })
   .use(queryPaginationModel)
   .guard({
-    query: "queryPagination",
+    query: "pagination.query",
+  });
+
+export const databasePlugin = new Elysia({ name: "connect-db" }).decorate(
+  "db",
+  db
+);
+
+export const idValidatePlugin = new Elysia({
+  name: "id-validate",
+})
+  .guard({
+    params: t.Object({
+      id: t.Numeric({
+        error: "Invalid id UwU",
+      }),
+    }),
+  })
+  .derive({ as: "scoped" }, ({ params }) => ({
+    idParams: params.id,
+  }))
+  .onBeforeHandle({ as: "scoped" }, ({ params }) => {
+    const { id } = params;
+    if (!id || +id < 1) {
+      throw new CustomError.InvalidParamError("Invalid id UwU");
+    }
   });

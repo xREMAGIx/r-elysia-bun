@@ -1,5 +1,9 @@
 import { InvalidContentError } from "@/libs/error";
-import { queryPaginationPlugin } from "@/libs/plugins";
+import {
+  databasePlugin,
+  idValidatePlugin,
+  queryPaginationPlugin,
+} from "@/libs/plugins";
 import {
   detailSimpleTodoDataSchema,
   insertSimpleTodoSchema,
@@ -9,10 +13,8 @@ import {
 import SimpleTodoService from "@/services/simple-todo.service";
 import { Elysia, t } from "elysia";
 
-export const simpleTodoRoutes = new Elysia({ prefix: "api/v1" });
-
-simpleTodoRoutes.group(
-  `/simple-todo`,
+export const simpleTodoRoutes = new Elysia({ name: "simple_todo" }).group(
+  `api/v1/simple-todo`,
   {
     detail: {
       tags: ["Simple Todo"],
@@ -20,14 +22,19 @@ simpleTodoRoutes.group(
   },
   (app) =>
     app
+      .use(databasePlugin)
+      .derive(({ db }) => {
+        return {
+          service: new SimpleTodoService(db),
+        };
+      })
       .use(simpleTodoModel)
-
       //* Create
       .post(
         "/",
-        async ({ body }) => {
+        async ({ body, service }) => {
           const { name, isCompleted } = body;
-          const data = await SimpleTodoService.create({
+          const data = await service.create({
             name: name,
             isCompleted: isCompleted ?? false,
           });
@@ -45,102 +52,95 @@ simpleTodoRoutes.group(
         }
       )
 
-      .guard(
-        {
-          params: t.Object({
-            id: t.Numeric({
-              error: "Invalid id param :<",
-            }),
-          }),
-        },
-        (innerApp) =>
-          innerApp
-            //* Detail
-            .get(
-              "/:id",
-              async ({ params, error }) => {
-                const { id } = params;
-                const data = await SimpleTodoService.getDetail({ id });
+      //* List
+      .guard((innerApp) =>
+        innerApp.use(queryPaginationPlugin).get(
+          "/",
+          async ({
+            query: { sortBy = "desc", limit = "10", page = "1" },
+            service,
+          }) => {
+            if (sortBy !== "asc" && sortBy !== "desc") {
+              throw new InvalidContentError("Sortby not valid!");
+            }
 
-                if (!data) {
-                  throw error(404, "Not Found UwU");
-                }
-
-                return {
-                  data,
-                };
-              },
-              {
-                response: detailSimpleTodoDataSchema,
-                detail: {
-                  summary: "Get Simple Todo Detail",
-                },
-              }
-            )
-            //* Update
-            .put(
-              "/:id",
-              async ({ params, body }) => {
-                const { id } = params;
-                const { name, isCompleted } = body;
-
-                const data = await SimpleTodoService.update({
-                  id,
-                  name,
-                  isCompleted: isCompleted ?? false,
-                });
-
-                return {
-                  data,
-                };
-              },
-              {
-                body: insertSimpleTodoSchema,
-                response: detailSimpleTodoDataSchema,
-                detail: {
-                  summary: "Update Simple Todo",
-                },
-              }
-            )
-            //* Delete
-            .delete(
-              "/:id",
-              ({ params }) => {
-                const { id } = params;
-
-                return SimpleTodoService.delete(id);
-              },
-              {
-                response: t.Object({
-                  id: t.Number(),
-                }),
-                detail: {
-                  summary: "Delete Simple Todo",
-                },
-              }
-            )
+            return await service.getList({
+              sortBy: sortBy ?? "asc",
+              limit: Number(limit),
+              page: Number(page),
+            });
+          },
+          {
+            response: listSimpleTodoDataSchema,
+            detail: {
+              summary: "Get Simple Todo List",
+            },
+          }
+        )
       )
 
-      //* List
-      .use(queryPaginationPlugin)
-      .get(
-        "/",
-        async ({ query: { sortBy = "desc", limit, page } }) => {
-          if (sortBy !== "asc" && sortBy !== "desc") {
-            throw new InvalidContentError("Sortby not valid!");
-          }
+      .guard((innerApp) =>
+        innerApp
+          .use(idValidatePlugin)
+          //* Detail
+          .get(
+            "/:id",
+            async ({ idParams, error, service }) => {
+              const data = await service.getDetail({ id: idParams });
 
-          return await SimpleTodoService.getList({
-            sortBy: sortBy ?? "asc",
-            limit: Number(limit),
-            page: Number(page),
-          });
-        },
-        {
-          response: listSimpleTodoDataSchema,
-          detail: {
-            summary: "Get Simple Todo List",
-          },
-        }
+              if (!data) {
+                throw error(404, "Not Found UwU");
+              }
+
+              return {
+                data,
+              };
+            },
+            {
+              response: detailSimpleTodoDataSchema,
+              detail: {
+                summary: "Get Simple Todo Detail",
+              },
+            }
+          )
+          //* Update
+          .put(
+            "/:id",
+            async ({ idParams, body, service }) => {
+              const { name, isCompleted } = body;
+
+              const data = await service.update({
+                id: idParams,
+                name,
+                isCompleted: isCompleted ?? false,
+              });
+
+              return {
+                data,
+              };
+            },
+            {
+              body: insertSimpleTodoSchema,
+              response: detailSimpleTodoDataSchema,
+              detail: {
+                summary: "Update Simple Todo",
+              },
+            }
+          )
+          //* Delete
+          .delete(
+            "/:id",
+            ({ idParams, service }) => {
+              return service.delete(idParams);
+            },
+            {
+              response: t.Object({
+                id: t.Number(),
+              }),
+              detail: {
+                summary: "Delete Simple Todo",
+              },
+            }
+          )
       )
 );
